@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI日报卡片生成器 - 小红书版</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+        }
+        
+        .controls {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background-color: #2d2d2d;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+            border: 1px solid #404040;
+        }
+        
+        .instructions {
+            background-color: #1e3a5f;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: left;
+            max-width: 600px;
+            margin: 0 auto 20px;
+            border: 1px solid #2c5282;
+        }
+        
+        .instructions h3 {
+            margin-top: 0;
+            color: #64b5f6;
+        }
+        
+        .instructions ol {
+            margin: 10px 0;
+            padding-left: 20px;
+            color: #b0bec5;
+        }
+        
+        .export-btn {
+            background-color: #ff4757;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 0 10px;
+            transition: all 0.3s;
+            box-shadow: 0 2px 8px rgba(255, 71, 87, 0.3);
+        }
+        
+        .export-btn:hover {
+            background-color: #ff3742;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(255, 71, 87, 0.4);
+        }
+        
+        .export-btn:disabled {
+            background-color: #555;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .canvas-method-btn {
+            background-color: #2ed573;
+            box-shadow: 0 2px 8px rgba(46, 213, 115, 0.3);
+        }
+        
+        .canvas-method-btn:hover {
+            background-color: #26d067;
+            box-shadow: 0 4px 12px rgba(46, 213, 115, 0.4);
+        }
+        
+        .status {
+            margin-top: 15px;
+            font-size: 14px;
+            color: #b0bec5;
+            min-height: 20px;
+        }
+        
+        .card-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 30px;
+            justify-content: center;
+            margin-bottom: 50px;
+        }
+        
+        .card-wrapper {
+            text-align: center;
+        }
+        
+        .preview-card {
+            width: 300px;
+            height: 400px;
+            background-color: #2d2d2d;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+            cursor: pointer;
+            transition: all 0.3s;
+            overflow: hidden;
+            position: relative;
+            border: 1px solid #404040;
+        }
+        
+        .preview-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.6);
+            border-color: #555;
+        }
+        
+        .preview-content {
+            padding: 20px;
+            font-size: 11px;
+            line-height: 1.6;
+            height: calc(100% - 60px);
+            overflow: hidden;
+            color: #e0e0e0;
+            text-align: left;
+        }
+        
+        .preview-page-number {
+            position: absolute;
+            bottom: 10px;
+            right: 20px;
+            font-size: 12px;
+            color: #888;
+        }
+        
+        .card-label {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #b0bec5;
+        }
+        
+        /* Canvas绘制区域 */
+        #canvasContainer {
+            position: fixed;
+            left: -9999px;
+            top: 0;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #404040;
+            border-top: 3px solid #ff4757;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            vertical-align: middle;
+            margin-right: 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <h2>🎨 AI日报 - 小红书卡片生成器</h2>
+        
+        <div class="instructions">
+            <h3>📋 使用说明</h3>
+            <ol>
+                <li>复制此页面的所有代码，保存为 .html 文件</li>
+                <li>在本地浏览器打开该文件</li>
+                <li>使用下方按钮生成和下载图片</li>
+            </ol>
+            <p style="margin: 10px 0; color: #666;">
+                💡 提示：如果在Claude中无法下载，请在本地浏览器中使用
+            </p>
+        </div>
+        
+        <div style="margin-top: 20px;">
+            <button class="export-btn canvas-method-btn" onclick="generateWithCanvas()">
+                使用Canvas生成图片（推荐）
+            </button>
+            <button class="export-btn" onclick="generateAllCanvasImages()">
+                批量生成所有图片
+            </button>
+        </div>
+        
+        <div class="status" id="status">准备就绪</div>
+    </div>
+    
+    <div class="card-container" id="cardContainer"></div>
+    <div id="canvasContainer">
+        <canvas id="renderCanvas"></canvas>
+    </div>
+    
+    <script>
+        const fullText = `Part 01【精选资讯】
+【1】强化学习之父Rich Sutton 在WAIC发布了最新演讲《从数据时代到经验时代的 AI》，核心思想是：AI的进化将从消化存量"数据"，转向通过与世界交互、主动获取"经验"。
+理解这个从"数据时代"到"经验时代"的范式转移，能帮我们看清当前大模型能力的边界，并思考如何构建下一代AI产品。
+视频链接：https://www.youtube.com/watch?v=Tp6XZL-C-c8
+【2】智谱AI发布GLM-4.5：面向推理、代码与智能体的开源 SOTA 模型。模型权重遵循 MIT License。
+建议大家看看官方公布的52道题目及Agent轨迹并尝试复现：https://huggingface.co/datasets/zai-org/CC-Bench-trajectories
+官方介绍链接：https://mp.weixin.qq.com/s/Dh0r-O-WZAvlKaxQOXjlpQ
+GitHub: https://github.com/zai-org/GLM-4.5
+HuggingFace: https://huggingface.co/collections/zai-org/glm-45-687c621d34bda8c9e4bf503b
+ModelScope: https://modelscope.cn/collections/GLM-45-b8693e2a08984f
+API 已上线开放平台 BigModel.cn，可以一键兼容 Claude Code 框架，也可以在智谱清言(chatglm.cn)和Z.ai免费体验满血版。
+
+Part 02【其他行业动态】
+1.世界人工智能大会（WAIC 2025）的部分看点。
+https://mp.weixin.qq.com/s/oeyURi8YKLxud2t_BV9Jyg
+2.扣子正式宣布拥抱开源。
+https://mp.weixin.qq.com/s/6jGoaE29S2oOrywCAB8zMg?from=groupmessage&isappinstalled=0&scene=1&clicktime=1753675604&enterid=1753675604&click_id=4#wechat_redirect?wxwork_userid=ChenHang
+3.蚂蚁数科正式发布金融推理大模型Agentar-Fin-R1，同时发布Finova大模型金融应用评测基准。
+https://mp.weixin.qq.com/s/FwstZ20-WT90F_kfSudWQQ
+4.通义万相2.2正式开源：开源文生视频Wan2.2-T2V-A14B、图生视频Wan2.2-I2V-A14B和统一视频生成Wan2.2-TI2V-5B。
+https://mp.weixin.qq.com/s/ivDFtXenaj4END34YPOFZw`;
+
+        let pages = [];
+        let currentPage = 0;
+
+        // 计算文本在canvas上的实际高度
+        function calculateTextHeight(ctx, text, maxWidth, lineHeight) {
+            const lines = text.split('');
+            let line = '';
+            let lineCount = 0;
+            
+            for (let i = 0; i < lines.length; i++) {
+                const testLine = line + lines[i];
+                const metrics = ctx.measureText(testLine);
+                
+                if (metrics.width > maxWidth && line.length > 0) {
+                    lineCount++;
+                    line = lines[i];
+                } else {
+                    line = testLine;
+                }
+            }
+            
+            if (line.length > 0) {
+                lineCount++;
+            }
+            
+            return lineCount * lineHeight;
+        }
+
+        // 改进的文本绘制函数，修复链接换行问题
+        function drawLeftAlignedText(context, text, x, y, maxWidth, lineHeight) {
+            context.save();
+            
+            const currentFont = context.font;
+            if (currentFont.includes('bold')) {
+                context.font = 'bold 36px "PingFang SC", "Microsoft YaHei", Arial, sans-serif';
+            } else {
+                context.font = '28px "PingFang SC", "Microsoft YaHei", Arial, sans-serif';
+            }
+            
+            context.textAlign = 'left';
+            context.textBaseline = 'top';
+            
+            const isURL = text.match(/^https?:\/\//);
+            context.fillStyle = isURL ? '#888' : '#e0e0e0';
+            
+            let currentY = y;
+            
+            if (isURL) {
+                // 使用新的URL换行逻辑
+                currentY = drawWrappedURL(context, text, x, currentY, maxWidth, lineHeight);
+            } else {
+                // 非URL文本的换行处理
+                currentY = drawWrappedText(context, text, x, currentY, maxWidth, lineHeight);
+            }
+            
+            context.restore();
+            return currentY;
+        }
+
+        // 完全重写的URL换行函数，修复换行问题
+        function drawWrappedURL(context, url, x, y, maxWidth, lineHeight) {
+            let currentY = y;
+            let currentLine = '';
+            
+            // 定义分割点：在这些字符后优先换行
+            const breakPoints = ['/', '?', '&', '=', '#', '-', '_'];
+            
+            // 将URL转换为带有潜在换行点标记的数组
+            let segments = [];
+            let currentSegment = '';
+            
+            for (let i = 0; i < url.length; i++) {
+                currentSegment += url[i];
+                
+                // 如果当前字符是分割点，将其作为独立段落
+                if (breakPoints.includes(url[i]) && i < url.length - 1) {
+                    segments.push(currentSegment);
+                    currentSegment = '';
+                }
+            }
+            
+            // 添加最后的段落
+            if (currentSegment) {
+                segments.push(currentSegment);
+            }
+            
+            // 逐段处理
+            for (let segment of segments) {
+                const testLine = currentLine + segment;
+                const testMetrics = context.measureText(testLine);
+                
+                // 如果添加这个段落会超出宽度
+                if (testMetrics.width > maxWidth) {
+                    // 如果当前行有内容，先绘制当前行
+                    if (currentLine.length > 0) {
+                        context.fillText(currentLine, x, currentY);
+                        currentY += lineHeight;
+                        currentLine = segment;
+                        
+                        // 检查新段落本身是否也太长
+                        const segmentMetrics = context.measureText(segment);
+                        if (segmentMetrics.width > maxWidth) {
+                            // 对过长的段落进行字符级分割
+                            const chars = segment.split('');
+                            currentLine = '';
+                            
+                            for (let char of chars) {
+                                const charTestLine = currentLine + char;
+                                const charMetrics = context.measureText(charTestLine);
+                                
+                                if (charMetrics.width > maxWidth && currentLine.length > 0) {
+                                    context.fillText(currentLine, x, currentY);
+                                    currentY += lineHeight;
+                                    currentLine = char;
+                                } else {
+                                    currentLine = charTestLine;
+                                }
+                            }
+                        }
+                    } else {
+                        // 如果当前行为空，但段落太长，进行字符级分割
+                        const chars = segment.split('');
+                        for (let char of chars) {
+                            const charTestLine = currentLine + char;
+                            const charMetrics = context.measureText(charTestLine);
+                            
+                            if (charMetrics.width > maxWidth && currentLine.length > 0) {
+                                context.fillText(currentLine, x, currentY);
+                                currentY += lineHeight;
+                                currentLine = char;
+                            } else {
+                                currentLine = charTestLine;
+                            }
+                        }
+                    }
+                } else {
+                    // 如果不超出宽度，添加到当前行
+                    currentLine = testLine;
+                }
+            }
+            
+            // 绘制最后一行（如果有内容）
+            if (currentLine.length > 0) {
+                context.fillText(currentLine, x, currentY);
+                currentY += lineHeight;
+            }
+            
+            return currentY;
+        }
+
+        // 处理普通文本换行的函数
+        function drawWrappedText(context, text, x, y, maxWidth, lineHeight) {
+            let currentY = y;
+            let currentLine = '';
+            
+            for (let i = 0; i < text.length; i++) {
+                const char = text[i];
+                const testLine = currentLine + char;
+                const metrics = context.measureText(testLine);
+                
+                if (metrics.width > maxWidth && currentLine.length > 0) {
+                    context.fillText(currentLine, x, currentY);
+                    currentY += lineHeight;
+                    currentLine = char;
+                } else {
+                    currentLine = testLine;
+                }
+            }
+            
+            if (currentLine.length > 0) {
+                context.fillText(currentLine, x, currentY);
+                currentY += lineHeight;
+            }
+            
+            return currentY;
+        }
+
+        // 绘制标题的函数
+        function drawTitle(context, x, y, maxWidth) {
+            context.save();
+            
+            context.font = 'bold 72px "PingFang SC", "Microsoft YaHei", Arial, sans-serif';
+            context.fillStyle = '#e0e0e0';
+            context.textAlign = 'center';
+            context.textBaseline = 'top';
+            
+            const title = 'AI产品经理的行业日报';
+            context.fillText(title, 450, y);
+            
+            context.restore();
+            
+            return y + 100;
+        }
+
+        function splitTextIntoPages() {
+            const canvas = document.getElementById('renderCanvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = 900;
+            canvas.height = 1200;
+            
+            const maxHeight = 1050; // 留出底部页码空间
+            const x = 50;
+            const maxWidth = 780; // 减少宽度，为右侧留出更多空间
+            
+            const lines = fullText.split('\n');
+            pages = [];
+            let currentPageLines = [];
+            let currentHeight = 80;
+            
+            // 第一页需要额外考虑标题高度
+            let isFirstPage = true;
+            if (isFirstPage) {
+                currentHeight = 180; // 为标题预留空间
+            }
+            
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                let lineHeight = 48;
+                let extraSpacing = 0;
+                
+                // 为Part标题设置样式
+                if (line.includes('Part 01') || line.includes('Part 02')) {
+                    ctx.font = 'bold 36px "PingFang SC", "Microsoft YaHei", Arial, sans-serif';
+                    lineHeight = 54;
+                    extraSpacing = 10; // Part标题前的额外间距
+                } else {
+                    ctx.font = '28px "PingFang SC", "Microsoft YaHei", Arial, sans-serif';
+                }
+                
+                // 计算这一行需要的高度
+                let estimatedHeight = lineHeight;
+                if (line.trim()) {
+                    // 如果是URL，需要特殊计算高度
+                    if (line.match(/^https?:\/\//)) {
+                        // 估算URL可能需要的行数
+                        const urlLength = ctx.measureText(line).width;
+                        const estimatedLines = Math.ceil(urlLength / maxWidth);
+                        estimatedHeight = estimatedLines * lineHeight;
+                    } else {
+                        estimatedHeight = calculateTextHeight(ctx, line, maxWidth, lineHeight);
+                    }
+                } else {
+                    // 空行
+                    estimatedHeight = 24;
+                }
+                
+                // 加上额外间距
+                estimatedHeight += extraSpacing;
+                
+                // 检查是否需要分页
+                if (currentHeight + estimatedHeight > maxHeight) {
+                    // 需要新建一页
+                    if (currentPageLines.length > 0) {
+                        pages.push(currentPageLines.join('\n'));
+                        currentPageLines = [];
+                        currentHeight = 80; // 重置高度
+                        isFirstPage = false;
+                    }
+                }
+                
+                // 添加当前行到当前页
+                currentPageLines.push(line);
+                currentHeight += estimatedHeight;
+            }
+            
+            // 添加最后一页
+            if (currentPageLines.length > 0) {
+                pages.push(currentPageLines.join('\n'));
+            }
+            
+            console.log(`总共分成了 ${pages.length} 页`);
+        }
+
+        function renderPage(pageIndex) {
+            const canvas = document.getElementById('renderCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = 900;
+            canvas.height = 1200;
+            
+            // 暗色背景
+            ctx.fillStyle = '#1a1a1a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            let y = 80;
+            const x = 50;
+            const maxWidth = 780; // 减少宽度，为右侧留出更多空间
+            
+            // 如果是第一页，绘制标题
+            if (pageIndex === 0) {
+                y = drawTitle(ctx, x, 50, maxWidth);
+                y += 30;
+            }
+            
+            // 绘制内容
+            const lines = pages[pageIndex].split('\n');
+            
+            lines.forEach(line => {
+                if (line.includes('Part 01') || line.includes('Part 02')) {
+                    // Part标题前增加间距
+                    y += 10;
+                    ctx.font = 'bold 36px "PingFang SC", "Microsoft YaHei", Arial, sans-serif';
+                    y = drawLeftAlignedText(ctx, line, x, y, maxWidth, 54);
+                } else if (line.trim()) {
+                    ctx.font = '28px "PingFang SC", "Microsoft YaHei", Arial, sans-serif';
+                    y = drawLeftAlignedText(ctx, line, x, y, maxWidth, 48);
+                } else {
+                    y += 24;
+                }
+            });
+            
+            // 页码
+            ctx.save();
+            ctx.fillStyle = '#888';
+            ctx.font = '20px "PingFang SC", "Microsoft YaHei", Arial, sans-serif';
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'top';
+            ctx.fillText(`${pageIndex + 1}/${pages.length}`, 850, 1150);
+            ctx.restore();
+        }
+
+        function downloadCanvasAsImage(pageIndex) {
+            const canvas = document.getElementById('renderCanvas');
+            canvas.toBlob(blob => {
+                const link = document.createElement('a');
+                link.download = `AI日报_第${pageIndex + 1}页.png`;
+                link.href = URL.createObjectURL(blob);
+                link.click();
+                URL.revokeObjectURL(link.href);
+            });
+        }
+
+        function generateWithCanvas() {
+            if (pages.length === 0) splitTextIntoPages();
+            
+            updateStatus('<span class="loading"></span>正在生成第1页...');
+            renderPage(0);
+            
+            setTimeout(() => {
+                downloadCanvasAsImage(0);
+                updateStatus('生成完成！点击预览卡片可生成其他页面');
+            }, 100);
+        }
+
+        async function generateAllCanvasImages() {
+            if (pages.length === 0) splitTextIntoPages();
+            
+            for (let i = 0; i < pages.length; i++) {
+                updateStatus(`<span class="loading"></span>正在生成第${i + 1}/${pages.length}页...`);
+                renderPage(i);
+                
+                await new Promise(resolve => {
+                    setTimeout(() => {
+                        downloadCanvasAsImage(i);
+                        resolve();
+                    }, 500);
+                });
+            }
+            
+            updateStatus('所有图片生成完成！');
+        }
+
+        function createPreviewCards() {
+            splitTextIntoPages();
+            const container = document.getElementById('cardContainer');
+            container.innerHTML = ''; // 清空容器
+            
+            pages.forEach((pageContent, index) => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'card-wrapper';
+                
+                const card = document.createElement('div');
+                card.className = 'preview-card';
+                card.onclick = () => {
+                    updateStatus(`<span class="loading"></span>正在生成第${index + 1}页...`);
+                    renderPage(index);
+                    setTimeout(() => {
+                        downloadCanvasAsImage(index);
+                        updateStatus('生成完成！');
+                    }, 100);
+                };
+                
+                const content = document.createElement('div');
+                content.className = 'preview-content';
+                
+                // 如果是第一页，在预览中也显示标题
+                let displayContent = pageContent;
+                if (index === 0) {
+                    displayContent = '<strong style="font-size: 16px; display: block; text-align: center; margin-bottom: 15px;">AI产品经理的行业日报</strong>' + pageContent;
+                }
+                
+                content.innerHTML = displayContent
+                    .replace(/\n/g, '<br>')
+                    .replace(/Part 01【精选资讯】/g, '<strong style="font-size: 14px; color: #64b5f6;">Part 01【精选资讯】</strong>')
+                    .replace(/Part 02【其他行业动态】/g, '<strong style="font-size: 14px; color: #64b5f6;">Part 02【其他行业动态】</strong>')
+                    .replace(/(https?:\/\/[^\s<]+)/g, '<span style="color: #888;">$1</span>');
+                
+                const pageNumber = document.createElement('div');
+                pageNumber.className = 'preview-page-number';
+                pageNumber.textContent = `${index + 1}/${pages.length}`;
+                
+                card.appendChild(content);
+                card.appendChild(pageNumber);
+                
+                const label = document.createElement('div');
+                label.className = 'card-label';
+                label.textContent = `第 ${index + 1} 页 - 点击生成图片`;
+                
+                wrapper.appendChild(card);
+                wrapper.appendChild(label);
+                container.appendChild(wrapper);
+            });
+        }
+
+        function updateStatus(message) {
+            document.getElementById('status').innerHTML = message;
+        }
+
+        // 初始化
+        window.onload = function() {
+            createPreviewCards();
+            updateStatus(`准备就绪，共 ${pages.length} 页`);
+        };
+    </script>
+</body>
+</html>
